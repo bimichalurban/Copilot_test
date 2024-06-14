@@ -1,0 +1,132 @@
+{
+    "visual": {
+        "name": "test",
+        "displayName": "test",
+        "guid": "test730AD62538544591AC01321CBBDCEDF2",
+        "visualClassName": "Visual",
+        "version": "1.0.0.0",
+        "description": "test demo",
+        "supportUrl": "notApplicable.com",
+        "gitHubUrl": "notApplicable.github.com/"
+    },
+    "author": {
+        "name": "demo",
+        "email": "demo@email.com"
+    },
+    "apiVersion": "5.1.0",
+    "style": "style/visual.less",
+    "stringResources": {},
+    "capabilities": {
+        "dataRoles": [{
+            "displayName": "Values",
+            "kind": "GroupingOrMeasure",
+            "name": "Values"
+        }],
+        "dataViewMappings": [{
+            "scriptResult": {
+                "dataInput": {
+                    "table": {
+                        "rows": {
+                            "select": [{
+                                "for": {
+                                    "in": "Values"
+                                }
+                            }],
+                            "dataReductionAlgorithm": {
+                                "top": {}
+                            }
+                        }
+                    }
+                },
+                "script": {
+                    "scriptProviderDefault": "R",
+                    "scriptOutputType": "html",
+                    "source": {
+                        "objectName": "rcv_script",
+                        "propertyName": "source"
+                    },
+                    "provider": {
+                        "objectName": "rcv_script",
+                        "propertyName": "provider"
+                    },
+                    "scriptSourceDefault": "############### Utility functions ###############\nlibraryRequireInstall = function(packageName, ...)\n{\n  if(!require(packageName, character.only = TRUE)) \n    warning(paste(\"*** The package: '\", packageName, \"' was not installed ***\", sep=\"\"))\n}\n\nlibraryRequireInstall(\"xml2\")\nlibraryRequireInstall(\"htmlwidgets\")\n\ninternalSaveWidget <- function(widget, fname)\n{\n  tempFname = paste(fname, \".tmp\", sep=\"\")\n  htmlwidgets::saveWidget(widget, file = tempFname, selfcontained = FALSE)\n  FlattenHTML(tempFname, fname)\n}\n\nFlattenHTML <- function(fnameIn, fnameOut)\n{\n  # Read and parse HTML file\n  # Embed all js and css files into one unified file\n  \n  if(!file.exists(fnameIn))\n    return(FALSE)\n  \n  dir = dirname(fnameIn)\n  html = read_html(fnameIn, useInternal = TRUE)\n  top = xml_root(html)\n  \n  # extract all <script> tags with src value\n  srcNode=xml_find_all(top, '//script[@src]')\n  for (node in srcNode)\n  {\n    b = xml_attrs(node)\n    fname = file.path(dir, b['src'])\n    alternateSrc = FindSrcReplacement(fname)\n    if (!is.null(alternateSrc))\n    {\n      s = alternateSrc\n      names(s) = 'src'\n      newNode = xml_new_root(\"script\")\n      xml_set_attrs(newNode, s)\n      xml_replace(node, newNode)\n    }else{\n      str=ReadFileForEmbedding(fname);\n      if (!is.null(str))\n      {      \n        newNode = xml_new_root(\"script\",str)\n        xml_set_attrs( newNode, c( type = \"text/javascript\") )\n        xml_replace(node, newNode)\n      }\n    }\n  }\n  \n  # extract all <link> tags with src value\n  linkNode=xml_find_all(top, '//link[@href]')\n  for (node in linkNode)\n  {\n    b = xml_attrs(node)\n    fname = file.path(dir, b['href'])\n    str = ReadFileForEmbedding(fname, FALSE);\n    if (!is.null(str))\n    {\n      newNode = xml_new_root(\"style\", str)\n      xml_replace(node, newNode)\n    }\n  }\n  \n  write_xml(html, file = fnameOut)\n  return(TRUE)\n}\n\nReadFileForEmbedding <- function(fname, addCdata = TRUE)\n{\n  data = ReadFullFile(fname)\n  if (is.null(data))\n    return(NULL)\n\n  str = paste(data, collapse ='\\n')\n  if (addCdata) {\n    str = paste(cbind('// <![CDATA[', str,'// ]]>'), collapse ='\\n')\n  }\n  return(str)\n}\n\nReadFullFile <- function(fname)\n{\n  if(!file.exists(fname))\n    return(NULL)\n  \n  con = file(fname, open = \"r\")\n  data = readLines(con)\n  close(con)\n  return(data)\n}\n\nFindSrcReplacement <- function(str)\n{\n  # finds reference to 'plotly' js and replaces with a version from CDN\n  # This allows the HTML to be smaller, since this script is not fully embedded in it\n  str <- iconv(str, to=\"UTF-8\")\n  pattern = \"plotly-(\\\\w.+)/plotly-latest.min.js\"\n  match1=regexpr(pattern, str)\n  attr(match1, 'useBytes') <- FALSE\n  strMatch=regmatches(str, match1, invert = FALSE)\n  if (length(strMatch) == 0) return(NULL)\n  \n  pattern2 = \"-(\\\\d.+)/\"\n  match2 = regexpr(pattern2, strMatch[1])\n  attr(match2, 'useBytes') <- FALSE\n  strmatch = regmatches(strMatch[1], match2)\n  if (length(strmatch) == 0) return(NULL)\n  \n  # CDN url is https://cdn.plot.ly/plotly-<Version>.js\n  # This matches the specific version used in the plotly package used.\n  verstr = substr(strmatch, 2, nchar(strmatch)-1)\n  str = paste('https://cdn.plot.ly/plotly-', verstr,'.min.js', sep='')\n  return(str)\n}\n\nReadFullFileReplaceString <- function(fnameIn, fnameOut, sourceString,targetString) {\n  # Replaces texts in file\n  # This makes it possible to replace e.g. paddings in the generated html widget code\n  if(!file.exists(fnameIn))\n    return(NULL)\n  tx  <- readLines(fnameIn,encoding = \"UTF-8\")\n  tx2  <- gsub(pattern = sourceString, replace = targetString, x = tx)\n  writeLines(tx2, con = fnameOut)\n}\n#################################################\n\n\n# ############### Library Declarations ###############\n# libraryRequireInstall(\"ggplot2\");\n# libraryRequireInstall(\"plotly\")\n# ####################################################\n# \n################### Actual code ####################\nlibraryRequireInstall(\"DiagrammeR\")\nlibraryRequireInstall(\"DiagrammeRsvg\")\nlibraryRequireInstall(\"processmapR\")\nlibraryRequireInstall(\"bupaR\")\nlibraryRequireInstall(\"svgPanZoom\")\n\n# library(\"DiagrammeR\")\n# library(\"DiagrammeRsvg\")\n# library(\"processmapR\")\n# library(\"bupaR\")\n# library(\"svgPanZoom\")\n\ndataset <- Values\n#if(\"Timestamp\" %in% colnames(dataset)) {\n#  dataset[[\"Timestamp\"]] <- as.POSIXct(dataset[[\"Timestamp\"]], format=\"%Y-%m-%d %H:%M:%S\")\n#}\n\n# Change type of data to datetime or as known as POSIXct work fortimestamp column to work in Bupar \ndataset$Timestamp <- as.POSIXct(dataset$Timestamp,format =\"%Y-%m-%d %H:%M\")\nprint(colnames(dataset))\n#Read the eventlog as dataframe divided into basic required columns  \nx <- bupaR::simple_eventlog(eventlog=dataset, case_id = \"Case\", activity_id = \"Activity\", timestamp=\"Timestamp\")\n\n# Draw process map\nmap <- process_map(x, render = T)\nsvg <- DiagrammeRsvg::export_svg(map)\nfig <- svgPanZoom(svg, controlIconsEnabled = TRUE, panEnabled = TRUE)\n\n\n\n# Create and Save Widget --------------------------------------------------\n\ninternalSaveWidget(fig, 'out.html');\n\n\n# Reduce Paddings --------------------------------------------------------\n\nReadFullFileReplaceString('out.html', 'out.html', ',\"padding\":[0-9]*,', ',\"padding\":0,')\n\n\n"
+                }
+            }
+        }],
+        "objects": {
+            "rcv_script": {
+                "properties": {
+                    "provider": {
+                        "type": {
+                            "text": true
+                        }
+                    },
+                    "source": {
+                        "type": {
+                            "scripting": {
+                                "source": true
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "suppressDefaultTitle": true,
+        "privileges": [{
+            "name": "WebAccess",
+            "parameters": ["https://cdn.plot.ly/"]
+        }]
+    },
+    "dependencies": {
+        "cranPackages": [{
+            "name": "ggplot2",
+            "displayName": "GG Plot 2",
+            "url": "https://cran.r-project.org/web/packages/ggplot2/index.html"
+        }, {
+            "name": "plotly",
+            "displayName": "Plotly",
+            "url": "https://cran.r-project.org/web/packages/plotly/index.html"
+        }, {
+            "name": "htmlwidgets",
+            "displayName": "HTML Widgets",
+            "url": "https://cran.r-project.org/web/packages/htmlwidgets/index.html"
+        }, {
+            "name": "xml2",
+            "displayName": "xml2",
+            "url": "https://cran.r-project.org/web/packages/xml2/index.html"
+        }, {
+            "name": "DiagrammeR",
+            "displayName": "DiagrammeR",
+            "url": "https://cran.r-project.org/web/packages/DiagrammeR/index.html"
+        }, {
+            "name": "DiagrammeRsvg",
+            "displayName": "DiagrammeRsvg",
+            "url": "https://cran.r-project.org/web/packages/DiagrammeRsvg/index.html"
+        }, {
+            "name": "processmapR",
+            "displayName": "processmapR",
+            "url": "https://cran.r-project.org/web/packages/processmapR/index.html"
+        }, {
+            "name": "bupaR",
+            "displayName": "bupaR",
+            "url": "https://cran.r-project.org/web/packages/bupaR/index.html"
+        }, {
+            "name": "svgPanZoom",
+            "displayName": "svgPanZoom",
+            "url": "https://cran.r-project.org/web/packages/svgPanZoom/index.html"
+        }, {
+            "name": "tidyverse",
+            "displayName": "tidyverse",
+            "url": "https://cran.r-project.org/web/packages/tidyverse/index.html"
+        }]
+    },
+    "content": {
+        "js": "var test730AD62538544591AC01321CBBDCEDF2;(()=>{\"use strict\";var e={754:(e,t,i)=>{i.d(t,{Kx:()=>l,St:()=>n,Tn:()=>r,ks:()=>d});var s=i(639);class a{}class o extends a{}class l{}class n extends a{}class r extends o{}class c extends a{constructor(e){super(),Object.assign(this,e)}getFormattingSlice(e,t){const i=this.type,s=this.name,a={displayName:t&&this.displayNameKey?t.getDisplayName(this.displayNameKey):this.displayName,description:t&&this.descriptionKey?t.getDisplayName(this.descriptionKey):this.description,uid:e+\"-\"+s};return Object.assign(Object.assign({},a),{control:{type:i,properties:this.getFormattingComponent(e,t)}})}getFormattingComponent(e,t){return{descriptor:s.y(e,this),value:this.value}}getRevertToDefaultDescriptor(e){return[{objectName:e,propertyName:this.name}]}setPropertiesValues(e,t){var i;let a=null===(i=null==e?void 0:e[t])||void 0===i?void 0:i[this.name];this.value=s.D(this,a,this.value)}}class d extends c{constructor(e){super(e),this.type=\"TextInput\"}getFormattingComponent(e){return Object.assign(Object.assign({},super.getFormattingComponent(e)),{placeholder:this.placeholder})}}},667:(e,t,i)=>{i.d(t,{A:()=>a});var s=i(754);const a=class{constructor(e){this.localizationManager=e}populateFormattingSettingsModel(e,t){var i,a;let o=new e,l=null===(i=null==t?void 0:t.metadata)||void 0===i?void 0:i.objects;return l&&(null===(a=o.cards)||void 0===a||a.forEach((e=>{var t;e instanceof s.St&&(null===(t=e.topLevelSlice)||void 0===t||t.setPropertiesValues(l,e.name)),(e instanceof s.Tn?[e]:e.groups).forEach((t=>{var i,s,a,o;null===(i=t.topLevelSlice)||void 0===i||i.setPropertiesValues(l,e.name),null===(s=null==t?void 0:t.slices)||void 0===s||s.forEach((t=>{null==t||t.setPropertiesValues(l,e.name)})),null===(o=null===(a=null==t?void 0:t.container)||void 0===a?void 0:a.containerItems)||void 0===o||o.forEach((t=>{var i;null===(i=null==t?void 0:t.slices)||void 0===i||i.forEach((t=>{null==t||t.setPropertiesValues(l,e.name)}))}))}))}))),o}buildFormattingModel(e){let t={cards:[]};return e.cards.filter((({visible:e=!0})=>e)).forEach((e=>{var i;let a={displayName:this.localizationManager&&e.displayNameKey?this.localizationManager.getDisplayName(e.displayNameKey):e.displayName,description:this.localizationManager&&e.descriptionKey?this.localizationManager.getDisplayName(e.descriptionKey):e.description,groups:[],uid:e.name+\"-card\",analyticsPane:e.analyticsPane};const o=e.name;if(e.topLevelSlice){let t=e.topLevelSlice.getFormattingSlice(o,this.localizationManager);t.suppressDisplayName=!0,a.topLevelToggle=t}null===(i=e.onPreProcess)||void 0===i||i.call(e);const l=e instanceof s.Tn;(l?[e].filter((({visible:e=!0})=>e)):e.groups.filter((({visible:e=!0})=>e))).forEach((e=>{const t=e.name+\"-group\",i={displayName:l?void 0:this.localizationManager&&e.displayNameKey?this.localizationManager.getDisplayName(e.displayNameKey):e.displayName,description:l?void 0:this.localizationManager&&e.descriptionKey?this.localizationManager.getDisplayName(e.descriptionKey):e.description,slices:[],uid:t,collapsible:e.collapsible,delaySaveSlices:e.delaySaveSlices,disabled:e.disabled,disabledReason:e.disabledReason};a.groups.push(i);const s={};if(e.container){const a=e.container,l=t+\"-container\",n={displayName:this.localizationManager&&a.displayNameKey?this.localizationManager.getDisplayName(a.displayNameKey):a.displayName,description:this.localizationManager&&a.descriptionKey?this.localizationManager.getDisplayName(a.descriptionKey):a.description,containerItems:[],uid:l};a.containerItems.forEach((e=>{const t=e.displayNameKey?e.displayNameKey:e.displayName,i=l+t;let a={displayName:this.localizationManager&&e.displayNameKey?this.localizationManager.getDisplayName(e.displayNameKey):e.displayName,slices:[],uid:i};this.buildFormattingSlices({slices:e.slices,objectName:o,sliceNames:s,formattingSlices:a.slices}),n.containerItems.push(a)})),i.container=n}if(e.slices){if(e.topLevelSlice){let t=e.topLevelSlice.getFormattingSlice(o,this.localizationManager);t.suppressDisplayName=!0,(null==i.displayName?a:i).topLevelToggle=t}this.buildFormattingSlices({slices:e.slices,objectName:o,sliceNames:s,formattingSlices:i.slices})}})),a.revertToDefaultDescriptors=this.getRevertToDefaultDescriptor(e),t.cards.push(a)})),t}buildFormattingSlices({slices:e,objectName:t,sliceNames:i,formattingSlices:s}){null==e||e.filter((({visible:e=!0})=>e)).forEach((e=>{let a=null==e?void 0:e.getFormattingSlice(t,this.localizationManager);a&&(void 0===i[e.name]?i[e.name]=0:(i[e.name]++,a.uid=`${a.uid}-${i[e.name]}`),s.push(a))}))}getRevertToDefaultDescriptor(e){var t;const i={};let a,o=[],l=[];return e instanceof s.St&&e.topLevelSlice&&o.push(...null===(t=e.topLevelSlice)||void 0===t?void 0:t.getRevertToDefaultDescriptor(e.name)),(e instanceof s.Tn?[e].filter((({visible:e=!0})=>e)):e.groups.filter((({visible:e=!0})=>e))).forEach((t=>{var s,n;a=this.getSlicesRevertToDefaultDescriptor(e.name,t.slices,i,t.topLevelSlice),null===(n=null===(s=t.container)||void 0===s?void 0:s.containerItems)||void 0===n||n.forEach((t=>{l=l.concat(this.getSlicesRevertToDefaultDescriptor(e.name,t.slices,i))})),o.push(...a.concat(l))})),o}getSlicesRevertToDefaultDescriptor(e,t,i,s){let a=[];return s&&(i[s.name]=!0,a=a.concat(s.getRevertToDefaultDescriptor(e))),null==t||t.forEach((t=>{t&&!i[t.name]&&(i[t.name]=!0,a=a.concat(t.getRevertToDefaultDescriptor(e)))})),a}}},674:(e,t,i)=>{i.d(t,{O:()=>a.A,z:()=>s});var s=i(754),a=i(667)},639:(e,t,i)=>{function s(e,t){return{objectName:e,propertyName:t.name,selector:t.selector,altConstantValueSelector:t.altConstantSelector,instanceKind:t.instanceKind}}function a(e,t,i){return null==t||\"object\"==typeof t&&!t.solid?i:t.solid?{value:null==t?void 0:t.solid.color}:(null==e?void 0:e.items)?e.items.find((e=>e.value==t)):t}i.d(t,{D:()=>a,y:()=>s})},255:(e,t,i)=>{i.d(t,{YD:()=>a,_I:()=>n,on:()=>o});let s=0;function a(){s=0}function o(e,t){let i=[];if(!e||!e.hasChildNodes())return;let s=e.children;for(let e=0;e<s.length;e++){let a;a=\"script\"===s.item(e).nodeName.toLowerCase()?l(s.item(e)):s.item(e).cloneNode(!0),t.appendChild(a),i.push(a)}return i}function l(e){let t=document.createElement(\"script\"),i=e.attributes;for(let e=0;e<i.length;e++)t.setAttribute(i[e].name,i[e].textContent),\"src\"===i[e].name.toLowerCase()&&(s++,t.onload=()=>{s--});return t.innerHTML=e.innerHTML,t}function n(){let e=window.setInterval((()=>{0===s&&(window.clearInterval(e),window.hasOwnProperty(\"HTMLWidgets\")&&window.HTMLWidgets.staticRender&&window.HTMLWidgets.staticRender())}),100)}},980:(e,t,i)=>{i.d(t,{S:()=>r});var s=i(674),a=s.z.Tn,o=s.z.Kx,l=s.z.ks;class n extends a{constructor(){super(...arguments),this.provider=new l({name:\"provider\",displayName:\"Provider\",value:void 0,placeholder:\"Provider\"}),this.source=new l({name:\"source\",displayName:\"Source\",value:void 0,placeholder:\"Source\"}),this.name=\"rcv_script\",this.displayName=\"rcv_script\",this.slices=[this.provider,this.source]}}class r extends o{constructor(){super(...arguments),this.rcvScriptCard=new n,this.cards=[this.rcvScriptCard]}}},789:(e,t,i)=>{i.d(t,{b:()=>r});var s,a=i(674),o=i(255),l=i(980);!function(e){e[e.Data=2]=\"Data\",e[e.Resize=4]=\"Resize\",e[e.ViewMode=8]=\"ViewMode\",e[e.Style=16]=\"Style\",e[e.ResizeEnd=32]=\"ResizeEnd\",e[e.All=62]=\"All\"}(s||(s={}));const n=[s.Resize,s.ResizeEnd,s.Resize+s.ResizeEnd];class r{constructor(e){this.formattingSettingsService=new a.O,e&&e.element&&(this.rootElement=e.element),this.headNodes=[],this.bodyNodes=[]}update(e){if(!(e&&e.type&&e.viewport&&e.dataViews&&0!==e.dataViews.length&&e.dataViews[0]))return;const t=e.dataViews[0];this.formattingSettings=this.formattingSettingsService.populateFormattingSettingsModel(l.S,e.dataViews[0]);let i=null;t.scriptResult&&t.scriptResult.payloadBase64&&(i=t.scriptResult.payloadBase64),-1===n.indexOf(e.type)?i&&this.injectCodeFromPayload(i):this.onResizing(e.viewport)}onResizing(e){}injectCodeFromPayload(e){if((0,o.YD)(),!e)return;let t=document.createElement(\"html\");try{t.innerHTML=window.atob(e)}catch(e){return}if(0===this.headNodes.length){for(;this.headNodes.length>0;){let e=this.headNodes.pop();document.head.removeChild(e)}let e=t.getElementsByTagName(\"head\");if(e&&e.length>0){let t=e[0];this.headNodes=(0,o.on)(t,document.head)}}for(;this.bodyNodes.length>0;){let e=this.bodyNodes.pop();this.rootElement.removeChild(e)}let i=t.getElementsByTagName(\"body\");if(i&&i.length>0){let e=i[0];this.bodyNodes=(0,o.on)(e,this.rootElement)}(0,o._I)()}getFormattingModel(){return this.formattingSettingsService.buildFormattingModel(this.formattingSettings)}}}},t={};function i(s){var a=t[s];if(void 0!==a)return a.exports;var o=t[s]={exports:{}};return e[s](o,o.exports,i),o.exports}i.d=(e,t)=>{for(var s in t)i.o(t,s)&&!i.o(e,s)&&Object.defineProperty(e,s,{enumerable:!0,get:t[s]})},i.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),i.r=e=>{\"undefined\"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:\"Module\"}),Object.defineProperty(e,\"__esModule\",{value:!0})};var s={};(()=>{i.r(s),i.d(s,{default:()=>o});var e=i(789),t=window.powerbi,a={name:\"test730AD62538544591AC01321CBBDCEDF2\",displayName:\"test\",class:\"Visual\",apiVersion:\"5.1.0\",create:t=>{if(e.b)return new e.b(t);throw\"Visual instance not found\"},createModalDialog:(e,t,i)=>{const s=globalThis.dialogRegistry;e in s&&new s[e](t,i)},custom:!0};void 0!==t&&(t.visuals=t.visuals||{},t.visuals.plugins=t.visuals.plugins||{},t.visuals.plugins.test730AD62538544591AC01321CBBDCEDF2=a);const o=a})(),test730AD62538544591AC01321CBBDCEDF2=s})();",
+        "iconBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2RpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDpBOEJGMzkxN0NBRDNFMDExQTcxQ0JFODI3ODBCQUE5RSIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDo3NEY1QjA1NUQ0OTAxMUUwQTgxREI2NjMxMkNEMUNEMyIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDo3NEY1QjA1NEQ0OTAxMUUwQTgxREI2NjMxMkNEMUNEMyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IFdpbmRvd3MiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo5Mjk5RDU1ODBGRDRFMDExQTcxQ0JFODI3ODBCQUE5RSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpBOEJGMzkxN0NBRDNFMDExQTcxQ0JFODI3ODBCQUE5RSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PpDoNX0AAAI3SURBVHjarJRLSFVRFIY9t7SiRDGLoEEPCRJRaCSYkxCiFCXCF+LIMExQLkilgumgwkbdBuWDRC2EomhURCOjgagkXEgKLUKhidobM6H0+i34rxyPnuvEA5/rXPda/1l7739vJxKJxG3ls93+hEKhTILxJhgMftmsiPxdhHw4CfepeR8dCyjWwwB0kZy3iVgCoQ2ewnmXxhrBD7Cgr/ZQVA17fDRPw2UYhzK6G99IsBse6/0QNME+H8FT4EA/YiPqOgA1q4IMzBNuw6iKjkCpj+Av+AdnEEmD3bxfhzvuDk30HaEaLsEkXCO53rN+Bwg5qsvTuj/TjGYtx9nINhRmEx7AYWiFW7AXOuEcbPOUvIZ2mnrl+PkQUbNEh4QHNKUSDdsSBWEOlmxTEfvs26FL9Khe211if6Acgee+xo7xzMgBxfq9qPe3fgWBGN2lEnqtG9nExM7CV3jp3bDos2bKJB0nHFRxAxRpA/5CIXyHh5ABv6GZqd9dJ6iz2SjbxMMypGhJFtTlNzu3kK7xgDxpove8U66FK2A+s6nul5gVVMEL+Ak7lG/T+g9JcIOGar2CRUoogxMwpP/bLTJMB9bRhDbkk5bBUU0y3ES0xS04CBfN9RSHiY90vJK0BHaSzG9h2eejS3RJeVfdtrGzuGyd8CX7Yq6ExuCH63jaVMPkFOv6OibB6DKs2+VEQp+WYBoqERn2sVWWRNN0YurIfeL14U6YkpkLYCSG6e0yqdCxvKBLIm5FgAEAV0nKuwMYRUsAAAAASUVORK5CYII="
+    },
+    "visualEntryPoint": "",
+    "externalJS": [],
+    "assets": {
+        "icon": "assets/icon.png"
+    }
+}
